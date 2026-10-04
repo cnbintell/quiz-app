@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GK Quiz Master</title>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #FF9A8B 0%, #FF6A88 55%, #FF99AC 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 15px;
+    }
+    .quiz-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 24px;
+      padding: 25px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+    .btn-option {
+      background: #f0f2f5;
+      border: 2px solid transparent;
+      border-radius: 16px;
+      padding: 14px;
+      width: 100%;
+      margin-bottom: 12px;
+      font-weight: 600;
+      color: #333;
+      cursor: pointer;
+    }
+    .btn-option.correct { background: #00b894 !important; color: white; }
+    .btn-option.wrong { background: #ff7675 !important; color: white; }
+    .badge { padding: 6px 12px; border-radius: 12px; font-weight: bold; font-size: 12px; background: #ffeaa7; color: #d63031; }
+  </style>
+</head>
+<body>
+
+  <div class="quiz-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <span class="badge">FREE USER</span>
+      <span id="timer" style="font-weight: bold; color: #d63031;">⏱️ 00:30</span>
+    </div>
+
+    <div id="quizBox">
+      <h3 id="questionText">မေးခွန်း ၁: APSC ၏ အရှည်မှာ မည်သည်နည်း?</h3>
+      <div id="options">
+        <button class="btn-option" onclick="checkAnswer(false, this)">A. ASEAN Peace Council</button>
+        <button class="btn-option" onclick="checkAnswer(true, this)">B. ASEAN Political-Security Community</button>
+        <button class="btn-option" onclick="checkAnswer(false, this)">C. ASEAN People Society</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function checkAnswer(isCorrect, btn) {
+      if(isCorrect) {
+        btn.classList.add("correct");
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      } else {
+        btn.classList.add("wrong");
+      }
+    }
+  </script>
+</body>
+</html>
