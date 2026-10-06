@@ -45,9 +45,9 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function R(f,n=5){for(let i=0;;i++){try{const r=await f();if(!r.error||i>=n-1||!/fetch|network|timeout|load failed/i.test(r.error.message))return r}catch(e){if(i>=n-1)return{error:e}}await sleep(800*2**i)}}
 let U=null,P=null,CATS=[],tm;
-let CFG={free_limit:10,site_title:"intellearn Quiz",site_logo:"",limit_msg:"မနက်ဖြန်ပြန်လာပါ။\n💎 Premium ဝင်ရင် ကန့်သတ်ချက်မရှိ ဖြေနိုင်ပါတယ်!"};
+let CFG={free_limit:10,free_cats:1,free_per_cat:10,site_title:"intellearn Quiz",site_logo:"",limit_msg:"မနက်ဖြန်ပြန်လာပါ။\n💎 Premium ဝင်ရင် ကန့်သတ်ချက်မရှိ ဖြေနိုင်ပါတယ်!"};
 function applyCfg(){$(".hd").innerHTML=(CFG.site_logo?`<img src="${esc(CFG.site_logo)}" style="height:40px;vertical-align:middle;border-radius:10px;margin-right:8px">`:"🎓 ")+esc(CFG.site_title);document.title=CFG.site_title}
-async function loadCfg(){const r=await R(()=>sb.from("settings").select("*"));(r.data||[]).forEach(x=>{if(x.key=="free_limit")CFG.free_limit=+x.value||10;if(x.key=="site_title"&&x.value)CFG.site_title=x.value;if(x.key=="site_logo")CFG.site_logo=x.value;if(x.key=="limit_msg"&&x.value)CFG.limit_msg=x.value});applyCfg()}
+async function loadCfg(){const r=await R(()=>sb.from("settings").select("*"));(r.data||[]).forEach(x=>{if(x.key=="free_limit")CFG.free_limit=+x.value||10;if(x.key=="free_cats")CFG.free_cats=+x.value||1;if(x.key=="free_per_cat")CFG.free_per_cat=+x.value||10;if(x.key=="site_title"&&x.value)CFG.site_title=x.value;if(x.key=="site_logo")CFG.site_logo=x.value;if(x.key=="limit_msg"&&x.value)CFG.limit_msg=x.value});applyCfg()}
 const card=h=>app.innerHTML=h;
 const today=()=>new Date().toISOString().slice(0,10);
 const sign=u=>u.is_premium?'<span class="b p">💎 Premium</span>':'<span class="b">🆓 Free</span>';
@@ -56,14 +56,30 @@ function toEmail(v,old){v=v.trim().replace(/[၀-၉]/g,c=>"၀၁၂၃၄၅�
 const disp=e=>{e=String(e||"");const m=e.match(/^ph(0\d+)@gmail\.com$/);return m?"📱 "+m[1]:e.endsWith(PH)?"📱 "+e.split("@")[0]:e};
 let NEXT=null;
 function DID(){let d=null;try{d=localStorage.getItem("did")}catch(e){}if(!d){const m=document.cookie.match(/(?:^|; )did=([^;]+)/);d=m&&m[1]}if(!d)d=crypto.randomUUID?crypto.randomUUID():"d"+Date.now()+Math.random().toString(36).slice(2);try{localStorage.setItem("did",d)}catch(e){}document.cookie="did="+d+";max-age=315360000;path=/;SameSite=Lax";return d}
-function authView(note){card(`<div class=card><h1>🔐 Premium အကောင့်</h1><p class=m>ဖုန်းနံပါတ် (သို့) Email နဲ့ ဝင်ပါ။ Code မလိုပါ။</p><input id=n placeholder="နာမည် (Register လုပ်ရင်သာ)"><input id=e type=text inputmode=email autocapitalize=off placeholder="ဖုန်းနံပါတ် (သို့) Email"><input id=p type=password placeholder="Password (၆ လုံးအထက်)"><button id=l>🔐 Login</button><button class=y id=r>📝 Register</button><button class=g id=gb>⬅ Guest အဖြစ်ပြန်သွား</button><div id=er class=m>${esc(note||"")}</div></div>`);
+async function started(){const sid=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());try{localStorage.setItem("sid",sid)}catch(x){}await R(()=>sb.rpc("set_session",{sid}));init()}
+function courseView(note){card(`<div class=card><h1>🎓 သင်တန်းသား</h1><p class=m>နာမည်၊ ဖုန်း/Email၊ သင်တန်းက ပေးထားတဲ့ Code ကို ဖြည့်ပါ။ Password မလိုပါ။</p><input id=cn placeholder="နာမည်"><input id=ce type=text inputmode=email autocapitalize=off placeholder="ဖုန်းနံပါတ် (သို့) Email"><input id=cc autocapitalize=characters placeholder="သင်တန်း Code"><button id=cg>🎓 ဝင်မယ်</button><button class=g id=cb>⬅ Back</button><div id=cm3 class=m>${esc(note||"")}</div></div>`);
+$("#cb").onclick=()=>authView();
+$("#cg").onclick=async()=>{const er=$("#cm3"),name=$("#cn").value.trim(),raw=$("#ce").value,code=$("#cc").value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");
+if(!name||!raw.trim()||!code)return er.textContent="နာမည်၊ ဖုန်း/Email၊ Code အားလုံးဖြည့်ပါ";
+er.textContent="⏳…";const em=toEmail(raw),pw="ic_"+code+"_"+em.split("@")[0].slice(-8);
+const si=await sb.auth.signInWithPassword({email:em,password:pw});
+if(si.error){
+if(/fetch|abort|network/i.test(si.error.message))return er.textContent="ကွန်ရက်ချိတ်ဆက်မရပါ";
+const ck=await R(()=>sb.rpc("check_code",{p_code:code}));if(!ck.data)return er.textContent="❌ Code မမှန်ပါ (သို့) သုံးခွင့်ပြည့်/သက်တမ်းကုန်သွားပါပြီ";
+const su=await sb.auth.signUp({email:em,password:pw,options:{data:{name}}});
+if(su.error)return er.textContent=/already|registered/i.test(su.error.message)?"❌ ဒီဖုန်း/Email နဲ့ အရင်စာရင်းသွင်းပြီးသား — Code မကိုက်ပါ။ Password နဲ့ ဝင်ပါ (သို့) Admin ကိုမေးပါ":"❌ "+su.error.message;
+if(!su.data.session)return er.textContent="Confirm email ON ဖြစ်နေသည် — Admin ကို ပြောပါ";
+const rd=await R(()=>sb.rpc("redeem_code",{p_code:code,p_name:name}));
+if(rd.error||!rd.data||!rd.data.ok)return er.textContent="❌ Code သုံးမရပါ ("+(rd.data?.msg||rd.error?.message||"")+")"}
+started()}}
+function authView(note){card(`<div class=card><h1>🔐 Premium အကောင့်</h1><p class=m>ဖုန်းနံပါတ် (သို့) Email နဲ့ ဝင်ပါ။ Code မလိုပါ။</p><input id=n placeholder="နာမည် (Register လုပ်ရင်သာ)"><input id=e type=text inputmode=email autocapitalize=off placeholder="ဖုန်းနံပါတ် (သို့) Email"><input id=p type=password placeholder="Password (၆ လုံးအထက်)"><button id=l>🔐 Login</button><button class=y id=r>📝 Register</button><button class=g id=cs>🎓 သင်တန်းသား (Code နဲ့ဝင်)</button><button class=g id=gb>⬅ Guest အဖြစ်ပြန်သွား</button><div id=er class=m>${esc(note||"")}</div></div>`);
 const msg=m=>/Invalid login/i.test(m)?"ဖုန်း/Email သို့ Password မှားနေသည် (သို့) Register မလုပ်ရသေးပါ":/already|registered/i.test(m)?"ဒီနံပါတ်/Email နဲ့ စာရင်းသွင်းပြီးသားပါ၊ Login ဝင်ပါ":/at least|short|weak/i.test(m)?"Password ပိုရှည်ရန်လိုသည်":/fetch|abort|network/i.test(m)?"ကွန်ရက်ချိတ်ဆက်မရပါ":"❌";
 const go=async reg=>{const er=$("#er");er.textContent="⏳…";const raw=$("#e").value,p=$("#p").value;if(!raw.trim()||!p)return er.textContent="ဖုန်း/Email နဲ့ Password ဖြည့်ပါ";let err=null;
 if(reg){const r=await sb.auth.signUp({email:toEmail(raw),password:p,options:{data:{name:$("#n").value}}});err=r.error;if(!err&&!r.data.session)err={message:"Confirm email ON ဖြစ်နေသည် — Supabase မှာ ပိတ်ပါ"}}
 else{for(const em of(raw.includes("@")?[toEmail(raw)]:[toEmail(raw),toEmail(raw,1)])){const r=await sb.auth.signInWithPassword({email:em,password:p});err=r.error;if(!err)break}}
 if(err)return er.textContent=msg(err.message)+" ["+err.message+"]";
 const sid=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());try{localStorage.setItem("sid",sid)}catch(x){}await R(()=>sb.rpc("set_session",{sid}));init()};
-$("#l").onclick=()=>go(0);$("#r").onclick=()=>go(1);$("#gb").onclick=()=>{NEXT=null;home()}}
+$("#l").onclick=()=>go(0);$("#r").onclick=()=>go(1);$("#cs").onclick=()=>courseView();$("#gb").onclick=()=>{NEXT=null;home()}}
 let SX={},UL=false;
 function mk(notes,dur){const sr=22050,n=Math.floor(sr*dur),d=new Float32Array(n);
 for(const o of notes){const s0=Math.floor(sr*(o.t||0)),dc=o.dc||6,P=o.p||[[1,1],[2.76,.45],[5.4,.2],[8.93,.1]];
@@ -110,29 +126,29 @@ $("#l").onclick=()=>go(0);$("#r").onclick=()=>go(1)}
 
 async function home(){
 CATS=(await R(()=>sb.from("categories").select("*").order("id"))).data||[];
-card(`<div class=card><div class=row>${U?`<div><h3>👋 ${esc(P.name||disp(P.email))}</h3>${sign(P)}</div><div>${P.is_admin?'<button class=y id=ad>🛠 Admin</button>':''}<button class=g id=lo>Logout</button></div>`:`<div><h3>👤 Guest</h3><span class=m>Free · တစ်ရက် ${CFG.free_limit} ပုဒ်</span></div><div><button class=y id=li>🔐 Login / Register</button></div>`}</div></div>
+card(`<div class=card><div class=row>${U?`<div><h3>👋 ${esc(P.name||disp(P.email))}</h3>${sign(P)}</div><div>${P.is_admin?'<button class=y id=ad>🛠 Admin</button>':''}<button class=g id=lo>Logout</button></div>`:`<div><h3>👤 Guest</h3><span class=m>Free · တစ်ရက် Category ${CFG.free_cats} ခု × ${CFG.free_per_cat} ပုဒ်</span></div><div><button class=y id=li>🔐 Login / Register</button></div>`}</div></div>
 <div class=card><h3>📚 Category ရွေးပါ</h3>${CATS.map(c=>`<button class=o data-c=${c.id}>📘 ${esc(c.name)} <span class=m>(${c.secs}s/ပုဒ်)</span></button>`).join("")||"<p class=m>Category မရှိသေးပါ</p>"}</div>
-${P.is_premium?"":`<div class=card style="background:linear-gradient(135deg,#ffe259,#ffa751)"><h3>💎 Premium ဝင်ပါ</h3><p>✅ Category အားလုံး ✅ ဖြေလိုသလောက် (၅/၁၀/၂၀/၃၀…) ✅ နေ့စဉ် ကန့်သတ်ချက်မရှိ<br>🆓 Free က တစ်ရက် ${CFG.free_limit} ပုဒ်ပဲ ဖြေရပါတယ်</p><button id=pm>💎 Premium ဝင်မယ်</button></div>`}`);
+${P.is_premium?"":`<div class=card style="background:linear-gradient(135deg,#ffe259,#ffa751)"><h3>💎 Premium ဝင်ပါ</h3><p>✅ Category အားလုံး ✅ ဖြေလိုသလောက် (၅/၁၀/၂၀/၃၀…) ✅ နေ့စဉ် ကန့်သတ်ချက်မရှိ<br>🆓 Free က တစ်ရက် Category ${CFG.free_cats} ခု၊ တစ်ခုကို ${CFG.free_per_cat} ပုဒ်ပဲ ဖြေရပါတယ်</p><button id=pm>💎 Premium ဝင်မယ်</button></div>`}`);
 if($("#li"))$("#li").onclick=()=>authView();if($("#lo"))$("#lo").onclick=async()=>{clearInterval(window.__t);window.__t=0;await sb.auth.signOut();U=null;P={};home()};if($("#ad"))$("#ad").onclick=()=>admin("gen");if($("#pm"))$("#pm").onclick=premium;
 document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>pickCat(+b.dataset.c))}
 
 async function pickCat(id){
-if(P.is_premium){card(`<div class=card><h3>📝 ဘယ်နှပုဒ်ဖြေမလဲ?</h3>${[5,10,20,30].map(n=>`<button data-n=${n}>${n}</button>`).join("")}<input id=cn type=number placeholder="စိတ်ကြိုက်ဂဏန်း"><button class=y id=go>စမယ်</button><button class=g id=bk>⬅ Back</button></div>`);
+if(P.is_premium||P.is_admin){card(`<div class=card><h3>📝 ဘယ်နှပုဒ်ဖြေမလဲ?</h3>${[5,10,20,30].map(n=>`<button data-n=${n}>${n}</button>`).join("")}<input id=cn type=number placeholder="စိတ်ကြိုက်ဂဏန်း"><button class=y id=go>စမယ်</button><button class=g id=bk>⬅ Back</button></div>`);
 document.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>quiz(id,+b.dataset.n));$("#go").onclick=()=>quiz(id,+$("#cn").value||10);$("#bk").onclick=home;return}
 const g=await R(()=>sb.rpc("guest_start",{p_did:DID(),p_cat:id})),gd=g.data;if(g.error||!gd)return alert("ချိတ်ဆက်မရပါ၊ ပြန်စမ်းပါ ["+(g.error?.message||"")+"]");const left=gd.ok?1:0;
-if(left<=0){card(`<div class=card><h3>⏳ ဒီနေ့အတွက် ${CFG.free_limit} ပုဒ် ဖြေပြီးပါပြီ</h3><p style="white-space:pre-wrap;line-height:1.7">${esc(CFG.limit_msg)}</p><button id=pm>💎 Premium ဝင်မယ်</button><button class=g id=bk>⬅ Back</button></div>`);$("#pm").onclick=premium;$("#bk").onclick=home;return}
+if(left<=0){card(`<div class=card><h3>⏳ ${gd.why=="same"?"ဒီ Category ကို ဒီနေ့ ဖြေပြီးပါပြီ":"ဒီနေ့အတွက် Free ကန့်သတ်ချက် ပြည့်ပါပြီ"}</h3><p style="white-space:pre-wrap;line-height:1.7">${esc(CFG.limit_msg)}</p><button id=pm>💎 Premium ဝင်မယ်</button><button class=g id=bk>⬅ Back</button></div>`);$("#pm").onclick=premium;$("#bk").onclick=home;return}
 quiz(id,0,gd.qs)}
 
 let Q=[],qi=0,sc=0,left=0,secs=30,t0=0,lock=false,cat=null;
 async function quiz(id,n,pre){cat=CATS.find(c=>c.id==id);secs=cat.secs;
-const r=pre?{data:pre}:await R(()=>sb.from("questions").select("*").eq("cat_id",id));const a=(r.data||[]).sort(()=>Math.random()-.5).slice(0,pre?pre.length:n);
+const r=pre?{data:pre}:await R(()=>sb.rpc("premium_start",{p_cat:id,p_n:n}));const a=(r.data||[]).sort(()=>Math.random()-.5);
 if(!a.length){card(`<div class=card>မေးခွန်းမရှိသေးပါ <button id=bk>⬅</button></div>`);$("#bk").onclick=home;return}
 Q=a;qi=0;sc=0;t0=Date.now();ask()}
 function ask(){if(qi>=Q.length)return fin();lock=false;left=secs;const q=Q[qi];
 card(`<div class=card><div class=row><b>❓ ${qi+1}/${Q.length}</b><b>⏱ <span id=t>${left}</span>s</b></div><div class=bar><i id=bar></i></div><h2>${esc(q.q)}</h2>${q.options.map((x,k)=>`<button class=o data-k=${k}>${"ABCD"[k]}. ${esc(x)}</button>`).join("")}<div id=ex class=m></div></div>`);
 document.querySelectorAll(".o").forEach(b=>b.onclick=()=>pick(+b.dataset.k));
 clearInterval(tm);tm=setInterval(()=>{left--;$("#t").textContent=left;$("#bar").style.width=left/secs*100+"%";$("#t").style.color=left<=5?"#ff1744":"";if(left>0&&left<=5)tick(left);if(left<=0)pick(-1)},1000)}
-function pick(k){if(lock)return;lock=true;clearInterval(tm);const q=Q[qi],ok=k==q.answer,bs=document.querySelectorAll(".o");
+function pick(k){if(lock)return;lock=true;clearInterval(tm);const q=Q[qi],ok=k==q.answer,bs=document.querySelectorAll(".o");if(q.id)sb.rpc("mark_seen",{p_did:DID(),p_ids:[q.id]}).then(()=>{},()=>{});
 bs[q.answer].classList.add("ok");if(k>=0&&!ok)bs[k].classList.add("no");
 if(ok){sc++;boom();good()}else{bad();document.body.classList.add("fl");setTimeout(()=>document.body.classList.remove("fl"),500)}
 $("#ex").innerHTML=(ok?"🎉 မှန်ပါတယ်!":k<0?"⌛ အချိန်ကုန်ပြီ":"💥 မှားပါတယ်")+"<br>💡 "+esc(q.explanation||"");
@@ -140,7 +156,7 @@ setTimeout(()=>{qi++;ask()},ok?1300:2500)}
 async function fin(){const s=Math.round((Date.now()-t0)/1000),pc=Math.round(sc*100/Q.length);
 card(`<div class=card style="text-align:center"><div style="font-size:56px">${pc>=70?"🏆":pc>=40?"👍":"💪"}</div><h2>ရလဒ်: ${sc}/${Q.length} (${pc}%)<br>⏱ ${Math.floor(s/60)}မိ ${s%60}စက္ကန့်</h2><div id=st class=m>📤 Admin ထံပို့နေသည်…</div>${P.is_premium?"":'<button class=y id=pm>💎 Premium ဝင်ပြီး ဆက်ဖြေမယ်</button>'}<button id=bk>🏠 Home</button></div>`);
 $("#bk").onclick=home;if($("#pm"))$("#pm").onclick=premium;if(pc>=70)boom(3);pc>=50?winEnd():loseEnd();
-const r=await R(()=>P.is_premium&&U?sb.from("results").insert({user_id:U.id,cat_id:cat.id,score:sc,total:Q.length,secs:s}):sb.rpc("guest_result",{p_did:DID(),p_who:U?(P.name||disp(P.email)):"Guest",p_cat:cat.id,p_score:sc,p_total:Q.length,p_secs:s}));$("#st").textContent=r.error?"⚠️ သိမ်းမရပါ":"✅ Admin ထံ ပို့ပြီး"}
+const r=await R(()=>(P.is_premium||P.is_admin)&&U?sb.from("results").insert({user_id:U.id,cat_id:cat.id,score:sc,total:Q.length,secs:s}):sb.rpc("guest_result",{p_did:DID(),p_who:U?(P.name||disp(P.email)):"Guest",p_cat:cat.id,p_score:sc,p_total:Q.length,p_secs:s}));$("#st").textContent=r.error?"⚠️ သိမ်းမရပါ":"✅ Admin ထံ ပို့ပြီး"}
 
 async function premium(){
 if(!U){NEXT="premium";return authView("Premium ဝင်ရန် အကောင့်အရင်ဖွင့်/ဝင်ပါ")}
@@ -162,37 +178,65 @@ if(n.endsWith(".docx"))return{text:(await mammoth.extractRawText({arrayBuffer:aw
 if(n.endsWith(".pptx")){const z=await JSZip.loadAsync(await f.arrayBuffer());let t="";for(const k of Object.keys(z.files).filter(k=>/ppt\/slides\/slide\d+\.xml$/.test(k)))t+=[...(await z.files[k].async("string")).matchAll(/<a:t>([^<]*)<\/a:t>/g)].map(m=>m[1]).join(" ")+"\n";return{text:t}}
 return{text:await f.text()}}
 async function callAI(body){let m="";for(let i=0;i<2;i++){const{data,error}=await sb.functions.invoke("ai",{body});if(!error&&data&&!data.error)return data;m=error?.message||data?.error||"";try{m=(await error.context.json()).error||m}catch{}if(/Admin|Login|Gemini:/.test(m))return{error:m};await sleep(1500)}return{error:m||"လိုင်းကျပ်နေသည်၊ ပြန်စမ်းပါ"}}
-const TABS={gen:"🤖 Quiz",qs:"❓ မေးခွန်း",chat:"💬 AI Chat",cat:"📁 Category",users:"👥 Users",res:"📊 ရလဒ်",pay:"💳 KPay/ပြေစာ",set:"⚙️ Settings"};
+const TABS={gen:"🤖 Quiz",qs:"❓ မေးခွန်း",chat:"💬 AI Chat",cat:"📁 Category",users:"👥 Users",res:"📊 ရလဒ်",pay:"💳 KPay/ပြေစာ",set:"⚙️ Settings",codes:"🎓 Codes"};
 async function admin(t){card(`<div class=card><div class=row><h3>🛠 Admin Panel</h3><button class=g id=hm>🏠</button></div><div class=tabs>${Object.entries(TABS).map(([k,v])=>`<button class="${k==t?"":"g"}" data-t=${k}>${v}</button>`).join("")}</div></div><div class=card id=body>⏳</div>`);
 $("#hm").onclick=home;document.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>admin(b.dataset.t));
 CATS=(await R(()=>sb.from("categories").select("*").order("id"))).data||[];const B=$("#body"),opts=CATS.map(c=>`<option value=${c.id}>${esc(c.name)}</option>`).join("");
-if(t=="gen"){B.innerHTML=`<select id=c>${opts}</select><input id=n type=number value=10 placeholder="ပုဒ်ရေ"><textarea id=cm rows=3 placeholder="🤖 AI ကို command ပေးပါ (ဥပမာ: မြန်မာနိုင်ငံ ပထဝီအကြောင်း အလယ်အလတ် မေးခွန်း ထုတ်ပေး)"></textarea><textarea id=tx rows=5 placeholder="Text ရိုက်/paste လုပ်ပါ (သို့) ဖိုင်ရွေးပါ"></textarea><input id=f type=file accept="image/*,.pdf,.txt,.docx,.pptx,.xlsx,.xls,.csv"><button id=g>🤖 Quiz ထုတ်မယ်</button><div id=st class=m></div>`;
-$("#g").onclick=async()=>{if(!$("#c").value)return $("#st").textContent="Category အရင်ဆောက်ပါ";$("#st").textContent="⏳ ထုတ်နေသည်… (ခဏစောင့်ပါ)";
-try{const fr=await readFile($("#f").files[0]);const r=await callAI({mode:"quiz",count:+$("#n").value||10,text:($("#cm").value.trim()?"ADMIN INSTRUCTION (follow this; if no content is given, use your own knowledge): "+$("#cm").value.trim()+"\n\nCONTENT:\n":"")+$("#tx").value+"\n"+(fr.text||""),image:fr.image,path:fr.path,mime:fr.mime});if(r.error)return $("#st").textContent="❌ "+r.error;
-const rows=r.questions.map(x=>({cat_id:+$("#c").value,q:x.q,options:x.o,answer:+x.a,explanation:x.e||""}));const i=await R(()=>sb.from("questions").insert(rows));$("#st").textContent=i.error?"❌ "+i.error.message:"✅ မေးခွန်း "+rows.length+" ပုဒ် ထည့်ပြီး"}catch(e){$("#st").textContent="❌ "+e.message}}}
+if(t=="gen"){B.innerHTML=`<select id=c>${opts}</select><div class=row><input id=n type=number value=10 style="flex:1" placeholder="ပုဒ်ရေ"><select id=lg style="flex:1"><option value=my>🇲🇲 မြန်မာလို</option><option value=en>🇬🇧 English</option><option value=auto>ဖိုင်/စာအတိုင်း</option></select></div><select id=lv><option value=easy>အဆင့်: လွယ်</option><option value=mid selected>အဆင့်: အလယ်အလတ်</option><option value=hard>အဆင့်: ခက်</option></select><textarea id=cm rows=3 placeholder="🤖 AI ကို command ပေးပါ (ဥပမာ: မြန်မာနိုင်ငံ ပထဝီအကြောင်း မေးခွန်း ထုတ်ပေး)"></textarea><textarea id=tx rows=5 placeholder="Text ရိုက်/paste လုပ်ပါ (သို့) ဖိုင်ရွေးပါ"></textarea><input id=f type=file accept="image/*,.pdf,.txt,.docx,.pptx,.xlsx,.xls,.csv,audio/*,video/*"><label class=m><input type=checkbox id=vf checked style="width:auto"> ✅ AI နဲ့ ထပ်စစ်ပြီး အမှားပြင်မယ် (နှေးနိုင်)</label><br><label class=m><input type=checkbox id=ap style="width:auto"> မစစ်ဘဲ ချက်ချင်း Approve လုပ်မယ်</label><br><button id=g>🤖 Quiz ထုတ်မယ်</button><div id=st class=m></div>`;
+$("#g").onclick=async()=>{if(!$("#c").value)return $("#st").textContent="Category အရင်ဆောက်ပါ";$("#st").textContent="⏳ ထုတ်နေသည်… (စစ်ဆေးရင် ၁ မိနစ်ခန့် ကြာနိုင်)";
+try{const fr=await readFile($("#f").files[0]);const r=await callAI({mode:"quiz",count:+$("#n").value||10,text:$("#tx").value+"\n"+(fr.text||""),cmd:$("#cm").value.trim(),lang:$("#lg").value,level:$("#lv").value,verify:$("#vf").checked,image:fr.image,path:fr.path,mime:fr.mime});if(r.error)return $("#st").textContent="❌ "+r.error;
+const ap=$("#ap").checked,rows=r.questions.map(x=>({cat_id:+$("#c").value,q:x.q,options:x.o,answer:+x.a,explanation:x.e||"",status:ap?"approved":"draft"}));const i2=await R(()=>sb.from("questions").insert(rows));
+$("#st").textContent=i2.error?"❌ "+i2.error.message:"✅ မေးခွန်း "+rows.length+" ပုဒ် ထည့်ပြီး"+(ap?"":" — 📝 Draft ဖြစ်နေပါတယ်။ ❓ မေးခွန်း tab မှာ စစ်ပြီး Approve လုပ်ပါ")}catch(e){$("#st").textContent="❌ "+e.message}}}
 if(t=="chat"){B.innerHTML=`<div id=log></div><textarea id=m rows=2 placeholder="မေးပါ…"></textarea><button id=s>➤ ပို့မယ်</button>`;$("#s").onclick=async()=>{const m=$("#m").value.trim();if(!m)return;$("#m").value="";$("#log").innerHTML+=`<div class="msg me">${esc(m)}</div>`;const r=await callAI({mode:"chat",text:m});$("#log").innerHTML+=`<div class="msg ai">${esc(r.text||"❌ "+r.error)}</div>`}}
-if(t=="qs"){B.innerHTML=`<select id=qc>${opts}</select><div id=ql></div>`;
-const form=(x,id)=>`<div class=it data-id="${id}"><textarea rows=2 data-f=q placeholder="မေးခွန်း">${esc(x.q||"")}</textarea>${[0,1,2,3].map(k=>`<input data-f=o${k} placeholder="${"ABCD"[k]}" value="${esc((x.options||[])[k]||"")}">`).join("")}<select data-f=a>${[0,1,2,3].map(k=>`<option value=${k} ${x.answer==k?"selected":""}>အဖြေမှန်: ${"ABCD"[k]}</option>`).join("")}</select><input data-f=e placeholder="ရှင်းလင်းချက်" value="${esc(x.explanation||"")}"><button data-sv>💾 သိမ်း</button>${id=="new"?"":'<button class=r data-del>🗑</button>'}</div>`;
-const load=async()=>{const cid=+$("#qc").value;if(!cid){$("#ql").textContent="Category အရင်ဆောက်ပါ";return}
-const rs=(await R(()=>sb.from("questions").select("*").eq("cat_id",cid).order("id",{ascending:false}).limit(200))).data||[];
-$("#ql").innerHTML=`<h3>➕ အသစ်ထည့်ရန်</h3>${form({},"new")}<p class=m>${rs.length} ပုဒ်</p>`+rs.map(x=>form(x,x.id)).join("");
-document.querySelectorAll("[data-sv]").forEach(b=>b.onclick=async()=>{const w=b.closest(".it"),g=f=>w.querySelector(`[data-f=${f}]`).value.trim(),id=w.dataset.id;
-const row={cat_id:cid,q:g("q"),options:[0,1,2,3].map(k=>g("o"+k)),answer:+g("a"),explanation:g("e")};
+if(t=="qs"){B.innerHTML=`<div class=row><select id=qc style="flex:1">${opts}</select><select id=qf style="flex:1"><option value="">အားလုံး</option><option value=draft>📝 Draft</option><option value=approved>✅ Approved</option></select></div><input id=qsr placeholder="🔎 ရှာမယ်"><div class=row><label class=m><input type=checkbox id=qall style="width:auto"> အားလုံးရွေး</label><span id=qn class=m>0 ရွေးထား</span></div><div class=tabs><button id=qa>✅ Approve</button><button class=g id=qd2>📝 Draft</button><button class=r id=qdel>🗑 ဖျက်</button></div><div class=row><select id=qm style="flex:1">${opts}</select><button class=g id=qmv>📁 ရွှေ့</button></div><div id=ql></div>`;
+let rows=[];
+const form=(x,id)=>`<div class=it><textarea rows=2 data-f=q placeholder="မေးခွန်း">${esc(x.q||"")}</textarea>${[0,1,2,3].map(k=>`<input data-f=o${k} placeholder="${"ABCD"[k]}" value="${esc((x.options||[])[k]||"")}">`).join("")}<select data-f=a>${[0,1,2,3].map(k=>`<option value=${k} ${x.answer==k?"selected":""}>အဖြေမှန်: ${"ABCD"[k]}</option>`).join("")}</select><input data-f=e placeholder="ရှင်းလင်းချက်" value="${esc(x.explanation||"")}"><button data-sv>💾 သိမ်း</button></div>`;
+const sel=()=>[...document.querySelectorAll(".qk:checked")].map(x=>+x.value);
+const cnt=()=>{$("#qn").textContent=sel().length+" ရွေးထား"};
+const bind=(w,id)=>{w.querySelector("[data-sv]").onclick=async()=>{const g=f=>w.querySelector(`[data-f=${f}]`).value.trim();
+const row={cat_id:+$("#qc").value,q:g("q"),options:[0,1,2,3].map(k=>g("o"+k)),answer:+g("a"),explanation:g("e")};
 if(!row.q||row.options.some(o=>!o))return alert("မေးခွန်းနဲ့ ရွေးချယ်စရာ ၄ ခုလုံး ဖြည့်ပါ");
-const r=await R(()=>id=="new"?sb.from("questions").insert(row):sb.from("questions").update(row).eq("id",id));if(r.error)return alert(r.error.message);if(id=="new")load();else b.textContent="✅"});
-document.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{if(confirm("ဖျက်မလား?")){await R(()=>sb.from("questions").delete().eq("id",b.closest(".it").dataset.id));load()}})};
-$("#qc").onchange=load;load()}
-if(t=="set"){B.innerHTML=`<label class=m>ခေါင်းစဉ်</label><input id=ti value="${esc(CFG.site_title)}"><label class=m>Free user နေ့စဉ် ဖြေခွင့် (ပုဒ်ရေ)</label><input id=fl type=number min=1 value=${CFG.free_limit}><label class=m>Limit ပြည့်ရင် Free user ကိုပြမယ့်စာ (Premium ဝင်ရန် ဆွဲဆောင်စာ)</label><textarea id=lm rows=4>${esc(CFG.limit_msg)}</textarea><label class=m>Logo (ပုံ)</label>${CFG.site_logo?`<img class=q style="max-height:80px" src="${esc(CFG.site_logo)}"><br><button class=g id=rl>🗑 Logo ဖယ်မယ်</button>`:""}<input id=lf type=file accept="image/*"><button id=sv>💾 သိမ်းမယ်</button><div id=st class=m></div>`;
+if(id=="new")row.status="approved";
+const r=await R(()=>id=="new"?sb.from("questions").insert(row):sb.from("questions").update(row).eq("id",id));if(r.error)return alert(r.error.message);load()}};
+const draw=()=>{const sr=$("#qsr").value.toLowerCase(),v=rows.filter(x=>!sr||(x.q+" "+(x.options||[]).join(" ")).toLowerCase().includes(sr));
+$("#ql").innerHTML=`<button class=g id=qnew>➕ အသစ်ကိုယ်တိုင်ထည့်</button><div id=qnf style="display:none"></div><p class=m>${v.length} ပုဒ်</p>`+v.map(x=>`<div class=it><label style="display:flex;gap:8px;align-items:flex-start"><input type=checkbox class=qk value=${x.id} style="width:auto;margin-top:5px"><span><span class="b ${x.status=="draft"?"p":""}">${x.status=="draft"?"📝":"✅"}</span> ${esc(x.q)}<br><span class=m>${(x.options||[]).map((o,k)=>(k==x.answer?"✔ ":"")+"ABCD"[k]+". "+esc(o)).join(" · ")}</span></span></label><button class=g data-ed=${x.id}>✏️ ပြင်</button><div data-ef=${x.id} style="display:none"></div></div>`).join("");
+$("#qnew").onclick=()=>{const w=$("#qnf");if(w.style.display=="none"){w.innerHTML=form({},"new");w.style.display="block";bind(w,"new")}else w.style.display="none"};
+document.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>{const id=+b.dataset.ed,w=document.querySelector(`[data-ef="${id}"]`);if(w.style.display=="none"){w.innerHTML=form(rows.find(x=>x.id==id),id);w.style.display="block";bind(w,id)}else w.style.display="none"});
+document.querySelectorAll(".qk").forEach(c=>c.onchange=cnt);cnt()};
+const load=async()=>{const cid=+$("#qc").value;if(!cid){$("#ql").textContent="Category အရင်ဆောက်ပါ";return}
+let q=sb.from("questions").select("*").eq("cat_id",cid).order("id",{ascending:false}).limit(300);const f=$("#qf").value;if(f)q=q.eq("status",f);
+rows=(await R(()=>q)).data||[];$("#qall").checked=false;draw()};
+const bulk=async(fn,msg)=>{const ids=sel();if(!ids.length)return alert("အရင်ရွေးပါ");if(msg&&!confirm(msg.replace("{n}",ids.length)))return;const r=await R(()=>fn(ids));if(r.error)return alert(r.error.message);load()};
+$("#qa").onclick=()=>bulk(ids=>sb.from("questions").update({status:"approved"}).in("id",ids));
+$("#qd2").onclick=()=>bulk(ids=>sb.from("questions").update({status:"draft"}).in("id",ids));
+$("#qdel").onclick=()=>bulk(ids=>sb.from("questions").delete().in("id",ids),"{n} ပုဒ် ဖျက်မလား?");
+$("#qmv").onclick=()=>bulk(ids=>sb.from("questions").update({cat_id:+$("#qm").value}).in("id",ids),"{n} ပုဒ်ကို ရွှေ့မလား?");
+$("#qall").onchange=e=>{document.querySelectorAll(".qk").forEach(c=>c.checked=e.target.checked);cnt()};
+$("#qc").onchange=load;$("#qf").onchange=load;$("#qsr").oninput=draw;load()}
+if(t=="set"){B.innerHTML=`<label class=m>ခေါင်းစဉ်</label><input id=ti value="${esc(CFG.site_title)}"><label class=m>Free user — တစ်ရက်ကို Category ဘယ်နှခု</label><input id=fc type=number min=1 value=${CFG.free_cats}><label class=m>Free user — Category တစ်ခုကို ဘယ်နှပုဒ်</label><input id=fp type=number min=1 value=${CFG.free_per_cat}><label class=m>Limit ပြည့်ရင် Free user ကိုပြမယ့်စာ (Premium ဝင်ရန် ဆွဲဆောင်စာ)</label><textarea id=lm rows=4>${esc(CFG.limit_msg)}</textarea><label class=m>Logo (ပုံ)</label>${CFG.site_logo?`<img class=q style="max-height:80px" src="${esc(CFG.site_logo)}"><br><button class=g id=rl>🗑 Logo ဖယ်မယ်</button>`:""}<input id=lf type=file accept="image/*"><button id=sv>💾 သိမ်းမယ်</button><div id=st class=m></div>`;
 const put=(key,value)=>R(()=>sb.from("settings").upsert({key,value:String(value)}));
 if($("#rl"))$("#rl").onclick=async()=>{await put("site_logo","");await loadCfg();admin("set")};
 $("#sv").onclick=async()=>{$("#st").textContent="⏳…";const f=$("#lf").files[0];
 if(f){const p="logo/"+Date.now()+".jpg";const u=await R(()=>sb.storage.from("receipts").upload(p,f));if(u.error)return $("#st").textContent="❌ "+u.error.message;await put("site_logo",sb.storage.from("receipts").getPublicUrl(p).data.publicUrl)}
-await put("site_title",$("#ti").value.trim()||"intellearn Quiz");await put("free_limit",Math.max(1,+$("#fl").value||10));await put("limit_msg",$("#lm").value.trim());await loadCfg();$("#st").textContent="✅ သိမ်းပြီး";if(f)admin("set")}}
+await put("site_title",$("#ti").value.trim()||"intellearn Quiz");await put("free_cats",Math.max(1,+$("#fc").value||1));await put("free_per_cat",Math.max(1,+$("#fp").value||10));await put("limit_msg",$("#lm").value.trim());await loadCfg();$("#st").textContent="✅ သိမ်းပြီး";if(f)admin("set")}}
+if(t=="codes"){const cs=(await R(()=>sb.from("access_codes").select("*").order("created_at",{ascending:false}))).data||[];
+B.innerHTML=`<h3>🎓 သင်တန်းသား Code</h3><p class=m>Code ရှိသူတွေက နာမည်၊ ဖုန်း/Email၊ Code ထည့်ရုံနဲ့ Premium ဝင်နိုင်ပါတယ်။</p><input id=cl placeholder="သင်တန်းအမည်/Batch (ဥပမာ Batch 5)"><div class=row><input id=cn2 type=number min=1 value=1 style="flex:1" placeholder="Code အရေအတွက်"><input id=cu type=number min=1 value=30 style="flex:1" placeholder="Code တစ်ခုကို သုံးခွင့်ရသူ"></div><input id=cc2 placeholder="Code ကိုယ်တိုင်ပေးမယ်ဆိုရင် (မဖြည့်ရင် အလိုအလျောက်)"><label class=m>သက်တမ်းကုန်ရက် (မထည့်လည်းရ)</label><input id=cx type=date><button id=cgen>🎟 ဖန်တီးမယ်</button><div id=cst class=m></div><div class=row><b>${cs.length} code</b><button class=g id=ccp>📋 အားလုံး copy</button></div>`+cs.map(c=>`<div class=it><b>${esc(c.code)}</b> • ${esc(c.label||"")} <span class=m>(${c.used}/${c.max_uses}${c.expires_at?" • ~"+c.expires_at:""})</span> ${c.active?"":"⛔"}<br><button class=g data-ct="${esc(c.code)}" data-v="${c.active}">${c.active?"⏸ ပိတ်":"▶ ဖွင့်"}</button><button class=g data-cw="${esc(c.code)}">👥 သုံးသူ</button><button class=r data-cr="${esc(c.code)}">🚫 Premium ဖြုတ်</button><button class=r data-cd="${esc(c.code)}">🗑</button><div class=m id="cu_${esc(c.code)}"></div></div>`).join("");
+const rc=()=>{const A="ABCDEFGHJKMNPQRSTUVWXYZ23456789";let x="";for(let i=0;i<6;i++)x+=A[Math.floor(Math.random()*A.length)];return x};
+$("#cgen").onclick=async()=>{const lb=$("#cl").value.trim(),n=Math.max(1,+$("#cn2").value||1),mu=Math.max(1,+$("#cu").value||1),cu=$("#cc2").value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,""),ex=$("#cx").value||null;
+if(!lb)return $("#cst").textContent="သင်တန်းအမည် ဖြည့်ပါ";
+const rows=cu&&n==1?[{code:cu,label:lb,max_uses:mu,expires_at:ex}]:Array.from({length:n},()=>({code:rc(),label:lb,max_uses:mu,expires_at:ex}));
+const r=await R(()=>sb.from("access_codes").insert(rows));if(r.error)return $("#cst").textContent="❌ "+r.error.message;admin("codes")};
+$("#ccp").onclick=()=>{const t=cs.map(c=>c.code+"\t"+(c.label||"")+"\t"+c.used+"/"+c.max_uses).join("\n");try{navigator.clipboard.writeText(t);$("#ccp").textContent="✅ copy ပြီး"}catch(e){prompt("Copy:",t)}};
+const uses=async code=>(await R(()=>sb.from("code_uses").select("user_id,profiles(name,email,is_premium)").eq("code",code))).data||[];
+document.querySelectorAll("[data-ct]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("access_codes").update({active:b.dataset.v!="true"}).eq("code",b.dataset.ct));admin("codes")});
+document.querySelectorAll("[data-cw]").forEach(b=>b.onclick=async()=>{const u=await uses(b.dataset.cw);document.getElementById("cu_"+b.dataset.cw).innerHTML=u.length?u.map(x=>(x.profiles?.is_premium?"💎 ":"❌ ")+esc(x.profiles?.name||"")+" • "+esc(disp(x.profiles?.email))).join("<br>"):"မသုံးသေးပါ"});
+document.querySelectorAll("[data-cr]").forEach(b=>b.onclick=async()=>{if(!confirm("ဒီ Code နဲ့ ဝင်သူအားလုံးရဲ့ Premium ကို ဖြုတ်မလား?"))return;const ids=(await uses(b.dataset.cr)).map(x=>x.user_id);if(ids.length)await R(()=>sb.from("profiles").update({is_premium:false}).in("id",ids));b.textContent="✅ ဖြုတ်ပြီး"});
+document.querySelectorAll("[data-cd]").forEach(b=>b.onclick=async()=>{if(confirm("Code ကို ဖျက်မလား? (ဝင်ပြီးသူတွေ Premium မပျက်ပါ)")){await R(()=>sb.from("access_codes").delete().eq("code",b.dataset.cd));admin("codes")}})}
 if(t=="cat"){B.innerHTML=`<input id=nm placeholder="Category နာမည်"><input id=sc type=number value=30 placeholder="စက္ကန့်/ပုဒ်"><button id=ad>➕ ထည့်မယ်</button>`+CATS.map(c=>`<div class=it>${esc(c.name)} • <input style="width:70px;display:inline;padding:6px" type=number value=${c.secs} data-s=${c.id}>s <button class=g data-u=${c.id}>💾</button><button class=r data-d=${c.id}>🗑</button></div>`).join("");
 $("#ad").onclick=async()=>{await R(()=>sb.from("categories").insert({name:$("#nm").value,secs:+$("#sc").value||30}));admin("cat")};
 document.querySelectorAll("[data-u]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("categories").update({secs:+document.querySelector(`[data-s="${b.dataset.u}"]`).value}).eq("id",b.dataset.u));b.textContent="✅"});
 document.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{if(confirm("မေးခွန်းတွေပါ ပျက်မယ်၊ သေချာလား?")){await R(()=>sb.from("categories").delete().eq("id",b.dataset.d));admin("cat")}})}
-if(t=="users"){const us=(await R(()=>sb.from("profiles").select("*").order("created_at",{ascending:false}))).data||[];B.innerHTML=`<p class=m>${us.length} ဦး</p>`+us.map(u=>`<div class=it><b>${esc(u.name||"-")}</b> ${sign(u)}${u.is_admin?' <span class="b p">Admin</span>':''}<br><span class=m>${esc(disp(u.email))}</span><br><button class="${u.is_premium?"r":""}" data-p=${u.id} data-v=${u.is_premium}>${u.is_premium?"💎 ပြန်ဖြုတ်":"💎 Premium ပေး"}</button>${u.id!=U.id?`<button class=g data-a=${u.id} data-v=${u.is_admin}>${u.is_admin?"Admin ဖြုတ်":"Admin ခန့်"}</button>`:""}</div>`).join("");
+if(t=="users"){const us=(await R(()=>sb.from("profiles").select("*").order("created_at",{ascending:false}))).data||[];B.innerHTML=`<p class=m>${us.length} ဦး</p>`+us.map(u=>`<div class=it><b>${esc(u.name||"-")}</b> ${sign(u)}${u.is_admin?' <span class="b p">Admin</span>':''}<br><span class=m>${esc(disp(u.email))}${u.course?" • 🎓 "+esc(u.course):""}</span><br><button class="${u.is_premium?"r":""}" data-p=${u.id} data-v=${u.is_premium}>${u.is_premium?"💎 ပြန်ဖြုတ်":"💎 Premium ပေး"}</button>${u.id!=U.id?`<button class=g data-a=${u.id} data-v=${u.is_admin}>${u.is_admin?"Admin ဖြုတ်":"Admin ခန့်"}</button>`:""}</div>`).join("");
 document.querySelectorAll("[data-p]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("profiles").update({is_premium:b.dataset.v!="true"}).eq("id",b.dataset.p));admin("users")});
 document.querySelectorAll("[data-a]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("profiles").update({is_admin:b.dataset.v!="true"}).eq("id",b.dataset.a));admin("users")})}
 if(t=="res"){const rs0=(await R(()=>sb.from("results").select("*,profiles(name,email)").order("created_at",{ascending:false}).limit(100))).data||[];
