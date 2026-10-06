@@ -2,9 +2,7 @@
 <html lang="my"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>intellearn Quiz</title>
-<script src="supabase.js"></script>
-<script>if(!window.supabase)document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>');</script>
-<script>if(!window.supabase)document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');</script>
+<script src="./supabase.js"></script>
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script async src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -117,7 +115,7 @@ document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>pickCat(+b.datase
 
 async function pickCat(id){
 if(P.is_premium){card(`<div class=card><h3>📝 ဘယ်နှပုဒ်ဖြေမလဲ?</h3>${[5,10,20,30].map(n=>`<button data-n=${n}>${n}</button>`).join("")}<input id=cn type=number placeholder="စိတ်ကြိုက်ဂဏန်း"><button class=y id=go>စမယ်</button><button class=g id=bk>⬅ Back</button></div>`);
-document.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>quiz(id,+b.dataset.n));$("#go").onclick=()=>quiz(id,+$("#cn").value||10);$("#bk").onclick=home;return}
+document.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>quiz(id,+b.dataset.n));$("#go").onclick=()=>quiz(id,+$("#cn").value\vert{}\vert{}10);$("#bk").onclick=home;return}
 const g=await R(()=>sb.rpc("guest_start",{p_did:DID(),p_cat:id})),gd=g.data;if(g.error||!gd)return alert("ချိတ်ဆက်မရပါ၊ ပြန်စမ်းပါ ["+(g.error?.message||"")+"]");const left=gd.ok?1:0;
 if(left<=0){card(`<div class=card><h3>⏳ ဒီနေ့အတွက် ${CFG.free_limit} ပုဒ် ဖြေပြီးပါပြီ</h3><p style="white-space:pre-wrap;line-height:1.7">${esc(CFG.limit_msg)}</p><button id=pm>💎 Premium ဝင်မယ်</button><button class=g id=bk>⬅ Back</button></div>`);$("#pm").onclick=premium;$("#bk").onclick=home;return}
 quiz(id,0,gd.qs)}
@@ -125,12 +123,12 @@ quiz(id,0,gd.qs)}
 let Q=[],qi=0,sc=0,left=0,secs=30,t0=0,lock=false,cat=null;
 async function quiz(id,n,pre){cat=CATS.find(c=>c.id==id);secs=cat.secs;
 const r=pre?{data:pre}:await R(()=>sb.from("questions").select("*").eq("cat_id",id));const a=(r.data||[]).sort(()=>Math.random()-.5).slice(0,pre?pre.length:n);
-if(!a.length){card(`<div class=card>မေးခွန်းမရှိသေးပါ <button id=bk>⬅</button></div>`);$("#bk").onclick=home;return}
+if!a.length;$("#bk").onclick=home;return}
 Q=a;qi=0;sc=0;t0=Date.now();ask()}
 function ask(){if(qi>=Q.length)return fin();lock=false;left=secs;const q=Q[qi];
 card(`<div class=card><div class=row><b>❓ ${qi+1}/${Q.length}</b><b>⏱ <span id=t>${left}</span>s</b></div><div class=bar><i id=bar></i></div><h2>${esc(q.q)}</h2>${q.options.map((x,k)=>`<button class=o data-k=${k}>${"ABCD"[k]}. ${esc(x)}</button>`).join("")}<div id=ex class=m></div></div>`);
 document.querySelectorAll(".o").forEach(b=>b.onclick=()=>pick(+b.dataset.k));
-clearInterval(tm);tm=setInterval(()=>{left--;$("#t").textContent=left;$("#bar").style.width=left/secs*100+"%";$("#t").style.color=left<=5?"#ff1744":"";if(left>0&&left<=5)tick(left);if(left<=0)pick(-1)},1000)}
+clearInterval(tm);tm=setInterval(()=>{left--;$("#t").textContent=left;$("#bar").style.width=left/secs*100+"\%";$("#t").style.color=left<=5?"#ff1744":"";if(left>0&&left<=5)tick(left);if(left<=0)pick(-1)},1000)}
 function pick(k){if(lock)return;lock=true;clearInterval(tm);const q=Q[qi],ok=k==q.answer,bs=document.querySelectorAll(".o");
 bs[q.answer].classList.add("ok");if(k>=0&&!ok)bs[k].classList.add("no");
 if(ok){sc++;boom();good()}else{bad();document.body.classList.add("fl");setTimeout(()=>document.body.classList.remove("fl"),500)}
@@ -167,7 +165,7 @@ $("#hm").onclick=home;document.querySelectorAll("[data-t]").forEach(b=>b.onclick
 CATS=(await R(()=>sb.from("categories").select("*").order("id"))).data||[];const B=$("#body"),opts=CATS.map(c=>`<option value=${c.id}>${esc(c.name)}</option>`).join("");
 if(t=="gen"){B.innerHTML=`<select id=c>${opts}</select><input id=n type=number value=10 placeholder="ပုဒ်ရေ"><textarea id=cm rows=3 placeholder="🤖 AI ကို command ပေးပါ (ဥပမာ: မြန်မာနိုင်ငံ ပထဝီအကြောင်း အလယ်အလတ် မေးခွန်း ထုတ်ပေး)"></textarea><textarea id=tx rows=5 placeholder="Text ရိုက်/paste လုပ်ပါ (သို့) ဖိုင်ရွေးပါ"></textarea><input id=f type=file accept="image/*,.pdf,.txt,.docx,.pptx,.xlsx,.xls,.csv"><button id=g>🤖 Quiz ထုတ်မယ်</button><div id=st class=m></div>`;
 $("#g").onclick=async()=>{if(!$("#c").value)return $("#st").textContent="Category အရင်ဆောက်ပါ";$("#st").textContent="⏳ ထုတ်နေသည်… (ခဏစောင့်ပါ)";
-try{const fr=await readFile($("#f").files[0]);const r=await callAI({mode:"quiz",count:+$("#n").value||10,text:($("#cm").value.trim()?"ADMIN INSTRUCTION (follow this; if no content is given, use your own knowledge): "+$("#cm").value.trim()+"\n\nCONTENT:\n":"")+$("#tx").value+"\n"+(fr.text||""),image:fr.image,path:fr.path,mime:fr.mime});if(r.error)return $("#st").textContent="❌ "+r.error;
+try{const fr=await readFile($("#f").files[0]);const r=await callAI({mode:"quiz",count:+$("#n").value\vert{}\vert{}10,text:($("#cm").value.trim()?"ADMIN INSTRUCTION (follow this; if no content is given, use your own knowledge): "+$("#cm").value.trim()+"\n\nCONTENT:\n":"")+$("#tx").value+"\n"+(fr.text\vert{}\vert{}""),image:fr.image,path:fr.path,mime:fr.mime});if(r.error)return $("#st").textContent="❌ "+r.error;
 const rows=r.questions.map(x=>({cat_id:+$("#c").value,q:x.q,options:x.o,answer:+x.a,explanation:x.e||""}));const i=await R(()=>sb.from("questions").insert(rows));$("#st").textContent=i.error?"❌ "+i.error.message:"✅ မေးခွန်း "+rows.length+" ပုဒ် ထည့်ပြီး"}catch(e){$("#st").textContent="❌ "+e.message}}}
 if(t=="chat"){B.innerHTML=`<div id=log></div><textarea id=m rows=2 placeholder="မေးပါ…"></textarea><button id=s>➤ ပို့မယ်</button>`;$("#s").onclick=async()=>{const m=$("#m").value.trim();if(!m)return;$("#m").value="";$("#log").innerHTML+=`<div class="msg me">${esc(m)}</div>`;const r=await callAI({mode:"chat",text:m});$("#log").innerHTML+=`<div class="msg ai">${esc(r.text||"❌ "+r.error)}</div>`}}
 if(t=="qs"){B.innerHTML=`<select id=qc>${opts}</select><div id=ql></div>`;
