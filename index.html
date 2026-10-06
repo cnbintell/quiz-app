@@ -35,9 +35,10 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:9}.fl{animation:fl .5s
 <button id="snd" onclick="snd()" style="position:fixed;right:12px;bottom:12px;z-index:5;width:46px;height:46px;border-radius:50%;padding:0;font-size:22px;background:#fffd;color:#222;box-shadow:0 4px 14px #0005">🔊</button>
 <script>
 if(!window.supabase){document.getElementById("app").innerHTML='<div class="card">❌ လိုအပ်တဲ့ library ကို မဖွင့်နိုင်ပါ။<br><span class=m>ကွန်ရက်ကို စစ်ပြီး ပြန်ဖွင့်ပါ။ (Admin: repo ထဲ supabase.js ထည့်ထားပါ)</span><br><button onclick="location.reload()">🔄 ပြန်စမ်း</button></div>';throw new Error("supabase lib missing")}
-const PROXY="https://quiz-proxy.cnbintell.workers.dev",DIRECT="https://fositnokxzztfwtbydro.supabase.co";let bases=[PROXY,DIRECT];
+const PROXY="https://quiz-proxy.cnbintell.workers.dev",DIRECT="https://fositnokxzztfwtbydro.supabase.co";const EXTRA=["https://enchanting-rugelach-219f1b.netlify.app","https://proxy-tau-ten-73.vercel.app"];
+let bases=[...EXTRA,PROXY,DIRECT];try{const lb=localStorage.getItem("base");if(lb&&bases.includes(lb))bases=[lb,...bases.filter(x=>x!=lb)]}catch(e){}
 async function sbFetch(u,o={}){const path=String(u).replace(PROXY,""),ms=/\/(functions|storage)\//.test(path)?120000:15000;let err;
-for(const b of [...bases]){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(b+path,{...o,signal:c.signal});if(b!=bases[0])bases=[b,...bases.filter(x=>x!=b)];return r}catch(e){err=e}finally{clearTimeout(t)}}throw err}
+for(const b of [...bases]){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(b+path,{...o,signal:c.signal});if(b!=bases[0])bases=[b,...bases.filter(x=>x!=b)];try{localStorage.setItem("base",b)}catch(e){}return r}catch(e){err=e}finally{clearTimeout(t)}}throw err}
 const sb=supabase.createClient(PROXY,"sb_publishable_5Hcqx3pkwYmhqS1-2Y-C3A_rrcInJde",{global:{fetch:sbFetch}});
 const $=s=>document.querySelector(s),app=$("#app");
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
