@@ -1,43 +1,209 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quiz App</title>
+<html lang="my"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>intellearn Quiz</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:system-ui,sans-serif;color:#222;background:linear-gradient(135deg,#6a11cb,#2575fc 50%,#ff6ec4);background-size:300% 300%;animation:bg 14s ease infinite;padding:14px}
+@keyframes bg{50%{background-position:100% 50%}}
+.card{max-width:560px;margin:0 auto 14px;background:#fff;border-radius:22px;padding:18px;box-shadow:0 10px 36px #0004}
+h1,h2,h3{margin:0 0 12px}h2{line-height:1.5}
+button{font:inherit;border:0;border-radius:14px;padding:12px 16px;background:#6a5acd;color:#fff;font-weight:600;cursor:pointer;margin:4px 2px}
+button.g{background:#eee;color:#333}button.r{background:#ff4d6d}button.y{background:#ffd54a;color:#333}
+input,select,textarea{font:inherit;width:100%;padding:12px;margin:6px 0;border:2px solid #ddd;border-radius:12px}
+.o{display:block;width:100%;text-align:left;margin:10px 0;padding:14px;background:#fff;color:#222;border:2px solid #ddd;font-weight:500}
+.o.ok{background:#3ddc84;color:#fff;border-color:#3ddc84}.o.no{background:#ff4d6d;color:#fff;border-color:#ff4d6d;animation:sh .4s}
+@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.bar{height:10px;background:#eee;border-radius:9px;overflow:hidden;margin:10px 0 16px}.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#43e97b,#f9d423,#ff4b2b);transition:width 1s linear}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.tabs{display:flex;flex-wrap:wrap}
+.b{font-size:12px;padding:3px 10px;border-radius:20px;background:#e8f5e9;color:#2e7d32}.p{background:#fff3cd;color:#8a6d00}
+.it{padding:10px 0;border-bottom:1px solid #eee;font-size:14px}.m{font-size:13px;color:#666}img.q{max-width:100%;border-radius:14px}
+.msg{padding:10px;border-radius:12px;margin:6px 0;white-space:pre-wrap}.me{background:#e8eaf6}.ai{background:#f1f8e9}
+.hd{max-width:560px;margin:0 auto 14px;text-align:center;color:#fff;font-size:26px;font-weight:800;letter-spacing:.5px;text-shadow:0 2px 10px #0006}
+.ft{max-width:560px;margin:18px auto 6px;text-align:center;color:#fffd;font-size:13px}
+canvas{position:fixed;inset:0;pointer-events:none;z-index:9}.fl{animation:fl .5s}@keyframes fl{50%{background:#ff1744}}
+</style></head><body>
+<canvas id="cv"></canvas>
+<div class="hd">🎓 intellearn Quiz</div>
+<div id="app"><div class="card">⏳ Loading…</div></div>
+<div class="ft">Copyright © intellearn</div>
+<button id="snd" onclick="snd()" style="position:fixed;right:12px;bottom:12px;z-index:5;width:46px;height:46px;border-radius:50%;padding:0;font-size:22px;background:#fffd;color:#222;box-shadow:0 4px 14px #0005">🔊</button>
+<script>
+const PROXY="https://quiz-proxy.cnbintell.workers.dev",DIRECT="https://fositnokxzztfwtbydro.supabase.co";let bases=[PROXY,DIRECT];
+async function sbFetch(u,o={}){const path=String(u).replace(PROXY,""),ms=/\/(functions|storage)\//.test(path)?120000:15000;let err;
+for(const b of [...bases]){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(b+path,{...o,signal:c.signal});if(b!=bases[0])bases=[b,...bases.filter(x=>x!=b)];return r}catch(e){err=e}finally{clearTimeout(t)}}throw err}
+const sb=supabase.createClient(PROXY,"sb_publishable_5Hcqx3pkwYmhqS1-2Y-C3A_rrcInJde",{global:{fetch:sbFetch}});
+const $=s=>document.querySelector(s),app=$("#app");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function R(f,n=5){for(let i=0;;i++){try{const r=await f();if(!r.error||i>=n-1||!/fetch|network|timeout|load failed/i.test(r.error.message))return r}catch(e){if(i>=n-1)return{error:e}}await sleep(800*2**i)}}
+let U=null,P=null,CATS=[],tm;
+let CFG={free_limit:10,site_title:"intellearn Quiz",site_logo:"",limit_msg:"မနက်ဖြန်ပြန်လာပါ။\n💎 Premium ဝင်ရင် ကန့်သတ်ချက်မရှိ ဖြေနိုင်ပါတယ်!"};
+function applyCfg(){$(".hd").innerHTML=(CFG.site_logo?`<img src="${esc(CFG.site_logo)}" style="height:40px;vertical-align:middle;border-radius:10px;margin-right:8px">`:"🎓 ")+esc(CFG.site_title);document.title=CFG.site_title}
+async function loadCfg(){const r=await R(()=>sb.from("settings").select("*"));(r.data||[]).forEach(x=>{if(x.key=="free_limit")CFG.free_limit=+x.value||10;if(x.key=="site_title"&&x.value)CFG.site_title=x.value;if(x.key=="site_logo")CFG.site_logo=x.value;if(x.key=="limit_msg"&&x.value)CFG.limit_msg=x.value});applyCfg()}
+const card=h=>app.innerHTML=h;
+const today=()=>new Date().toISOString().slice(0,10);
+const sign=u=>u.is_premium?'<span class="b p">💎 Premium</span>':'<span class="b">🆓 Free</span>';
+const PH="@phone.intellearn.com";
+function toEmail(v,old){v=v.trim().replace(/[၀-၉]/g,c=>"၀၁၂၃၄၅၆၇၈၉".indexOf(c));if(v.includes("@"))return v.toLowerCase();let d=v.replace(/\D/g,"");if(d.startsWith("959"))d="0"+d.slice(2);else if(d&&!d.startsWith("0"))d="0"+d;return old?d+PH:"ph"+d+"@gmail.com"}
+const disp=e=>{e=String(e||"");const m=e.match(/^ph(0\d+)@gmail\.com$/);return m?"📱 "+m[1]:e.endsWith(PH)?"📱 "+e.split("@")[0]:e};
+let NEXT=null;
+function DID(){let d=null;try{d=localStorage.getItem("did")}catch(e){}if(!d){const m=document.cookie.match(/(?:^|; )did=([^;]+)/);d=m&&m[1]}if(!d)d=crypto.randomUUID?crypto.randomUUID():"d"+Date.now()+Math.random().toString(36).slice(2);try{localStorage.setItem("did",d)}catch(e){}document.cookie="did="+d+";max-age=315360000;path=/;SameSite=Lax";return d}
+function authView(note){card(`<div class=card><h1>🔐 Premium အကောင့်</h1><p class=m>ဖုန်းနံပါတ် (သို့) Email နဲ့ ဝင်ပါ။ Code မလိုပါ။</p><input id=n placeholder="နာမည် (Register လုပ်ရင်သာ)"><input id=e type=text inputmode=email autocapitalize=off placeholder="ဖုန်းနံပါတ် (သို့) Email"><input id=p type=password placeholder="Password (၆ လုံးအထက်)"><button id=l>🔐 Login</button><button class=y id=r>📝 Register</button><button class=g id=gb>⬅ Guest အဖြစ်ပြန်သွား</button><div id=er class=m>${esc(note||"")}</div></div>`);
+const msg=m=>/Invalid login/i.test(m)?"ဖုန်း/Email သို့ Password မှားနေသည် (သို့) Register မလုပ်ရသေးပါ":/already|registered/i.test(m)?"ဒီနံပါတ်/Email နဲ့ စာရင်းသွင်းပြီးသားပါ၊ Login ဝင်ပါ":/at least|short|weak/i.test(m)?"Password ပိုရှည်ရန်လိုသည်":/fetch|abort|network/i.test(m)?"ကွန်ရက်ချိတ်ဆက်မရပါ":"❌";
+const go=async reg=>{const er=$("#er");er.textContent="⏳…";const raw=$("#e").value,p=$("#p").value;if(!raw.trim()||!p)return er.textContent="ဖုန်း/Email နဲ့ Password ဖြည့်ပါ";let err=null;
+if(reg){const r=await sb.auth.signUp({email:toEmail(raw),password:p,options:{data:{name:$("#n").value}}});err=r.error;if(!err&&!r.data.session)err={message:"Confirm email ON ဖြစ်နေသည် — Supabase မှာ ပိတ်ပါ"}}
+else{for(const em of(raw.includes("@")?[toEmail(raw)]:[toEmail(raw),toEmail(raw,1)])){const r=await sb.auth.signInWithPassword({email:em,password:p});err=r.error;if(!err)break}}
+if(err)return er.textContent=msg(err.message)+" ["+err.message+"]";
+const sid=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());try{localStorage.setItem("sid",sid)}catch(x){}await R(()=>sb.rpc("set_session",{sid}));init()};
+$("#l").onclick=()=>go(0);$("#r").onclick=()=>go(1);$("#gb").onclick=()=>{NEXT=null;home()}}
+let SX={},UL=false;
+function mk(notes,dur){const sr=22050,n=Math.floor(sr*dur),d=new Float32Array(n);
+for(const o of notes){const s0=Math.floor(sr*(o.t||0)),dc=o.dc||6,P=o.p||[[1,1],[2.76,.45],[5.4,.2],[8.93,.1]];
+for(let i=0;s0+i<n;i++){const t=i/sr,e=Math.exp(-dc*t);if(e<.002)break;let v=0;for(const [r,a] of P)v+=a*Math.sin(2*Math.PI*o.f*r*t)*Math.exp(-dc*.35*r*t);d[s0+i]+=v*e*(o.a||.3)}}
+const b=new ArrayBuffer(44+n*2),w=new DataView(b),W=(o,x)=>{for(let i=0;i<x.length;i++)w.setUint8(o+i,x.charCodeAt(i))};
+W(0,"RIFF");w.setUint32(4,36+n*2,true);W(8,"WAVEfmt ");w.setUint32(16,16,true);w.setUint16(20,1,true);w.setUint16(22,1,true);w.setUint32(24,sr,true);w.setUint32(28,sr*2,true);w.setUint16(32,2,true);w.setUint16(34,16,true);W(36,"data");w.setUint32(40,n*2,true);
+for(let i=0;i<n;i++)w.setInt16(44+i*2,Math.max(-1,Math.min(1,d[i]))*32767,true);
+return URL.createObjectURL(new Blob([b],{type:"audio/wav"}))}
+function build(){if(SX.good)return;const A=x=>{const a=new Audio(x);a.preload="auto";return a};
+SX.good=A(mk([{f:1047,dc:5},{f:1319,t:.09,dc:5},{f:1568,t:.18,dc:4}],1.3));
+SX.bad=A(mk([{f:196,dc:7,p:[[1,1],[2,.3]],a:.55},{f:147,t:.2,dc:6,p:[[1,1],[2,.3]],a:.55}],.9));
+SX.tick=A(mk([{f:1800,dc:70,p:[[1,1],[2,.3]],a:.5}],.12));
+SX.tap=A(mk([{f:1568,dc:22,a:.22}],.35));
+SX.win=A(mk([1047,1319,1568,2093,2637].map((f,i)=>({f,t:i*.12,dc:4})),2.2));
+SX.lose=A(mk([392,349,311,262].map((f,i)=>({f,t:i*.25,dc:4,p:[[1,1],[2,.2]],a:.35})),2))}
+function unlock(){if(UL)return;try{if(navigator.audioSession)navigator.audioSession.type="playback";build();UL=true;Object.values(SX).forEach(a=>{a.muted=true;const q=a.play();if(q&&q.then)q.then(()=>{a.pause();a.currentTime=0;a.muted=false}).catch(()=>{a.muted=false});else a.muted=false})}catch(e){}}
+function play(n){if(!SND)return;try{build();const a=SX[n];if(!a)return;a.muted=false;a.currentTime=0;const q=a.play();if(q&&q.catch)q.catch(()=>{})}catch(e){}}
+document.addEventListener("pointerdown",unlock);document.addEventListener("touchend",unlock);
+let AC;let SND=true;try{SND=localStorage.getItem("snd")!=="0"}catch(e){}
+function tone(f,d,type,v,when){if(!SND)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state=="suspended")AC.resume();const o=AC.createOscillator(),g=AC.createGain(),s=AC.currentTime+(when||0);o.type=type;o.frequency.value=f;o.connect(g);g.connect(AC.destination);g.gain.setValueAtTime(v,s);g.gain.exponentialRampToValueAtTime(.001,s+d);o.start(s);o.stop(s+d)}catch(e){}}
+function haptic(){try{const l=document.createElement("label");l.style.cssText="position:fixed;left:-99px;top:-99px;opacity:0";l.innerHTML="<input type=checkbox switch>";document.body.appendChild(l);l.click();setTimeout(()=>l.remove(),80)}catch(e){}}
+const vib=p=>{if(!SND)return;try{if(navigator.vibrate){navigator.vibrate(p);return}}catch(e){}haptic();if(Array.isArray(p))setTimeout(haptic,140)};
+const good=()=>{play("good");vib(60)};
+const bad=()=>{play("bad");vib([150,80,150])};
+const tick=n=>{play("tick");vib(15)};
+const tap=()=>{play("tap");vib(8)};
+const winEnd=()=>{play("win");vib([80,50,80,50,200])};
+const loseEnd=()=>{play("lose");vib([300,100,300])};
+function snd(){SND=!SND;try{localStorage.setItem("snd",SND?"1":"0")}catch(e){}$("#snd").textContent=SND?"🔊":"🔇";if(SND)tap()}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(b&&!b.classList.contains("o")&&b.id!="snd")tap()});
+setTimeout(()=>{try{$("#snd").textContent=SND?"🔊":"🔇"}catch(e){}},0);
 
-  <!-- Canvas Confetti Library -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+async function init(){applyCfg();loadCfg();
+setTimeout(()=>{if(app.textContent.includes("Loading")){card('<div class=card>⚠️ ချိတ်ဆက်မှု နှေးနေသည်။<br><span class=m>Wi-Fi ကိုပိတ်ပြီး ဖုန်း data နဲ့ စမ်းကြည့်ပါ။</span><br><button id=rt>🔄 ပြန်စမ်း</button></div>');$("#rt").onclick=()=>location.reload()}},12000);const{data}=await sb.auth.getSession();if(!data.session){U=null;P={};return home()}U=data.session.user;await loadP();if(await chk())return;if(!window.__t)window.__t=setInterval(chk,20000);home();if(NEXT){NEXT=null;if(!P.is_premium)premium()}}
+async function chk(){if(!U||(P&&P.is_admin))return false;const r=await sb.from("profiles").select("session_id").eq("id",U.id).single();let mine=null;try{mine=localStorage.getItem("sid")}catch(x){}
+if(r.data&&r.data.session_id&&r.data.session_id!==mine){clearInterval(window.__t);window.__t=0;clearInterval(tm);U=null;try{localStorage.removeItem("sid")}catch(x){}await sb.auth.signOut();authView();$("#er").textContent="⚠️ တခြားစက်မှာ ဝင်သွားလို့ ဒီစက်က ထွက်သွားပါပြီ";return true}return false}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)chk()});
+async function loadP(){P=(await R(()=>sb.from("profiles").select("*").eq("id",U.id).single())).data||{}}
+function authViewOld(){card(`<div class=card><h1>🎯 Quiz Master</h1><p class=m>Login / Register</p><input id=n placeholder="နာမည် (Register အတွက်)"><input id=e type=text inputmode=email autocapitalize=off placeholder="ဖုန်းနံပါတ် (သို့) Email"><input id=p type=password placeholder="Password (၆ လုံးအထက်)"><button id=l>🔐 Login</button><button class=y id=r>📝 Register</button><div id=er class=m></div></div>`);
+const go=async reg=>{$("#er").textContent="⏳…";const e=toEmail($("#e").value),p=$("#p").value;const{error}=reg?await sb.auth.signUp({email:e,password:p,options:{data:{name:$("#n").value}}}):await sb.auth.signInWithPassword({email:e,password:p});if(error)return $("#er").textContent="❌ "+error.message;
+const sid=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());try{localStorage.setItem("sid",sid)}catch(x){}
+await R(()=>sb.rpc("set_session",{sid}));init()};
+$("#l").onclick=()=>go(0);$("#r").onclick=()=>go(1)}
 
-  <style>
-    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-    .quiz-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); padding: 20px; border-radius: 15px; margin-top: 30px; }
-    .btn { background: #ff7eb3; border: none; color: white; padding: 12px 20px; border-radius: 25px; margin: 8px; width: 80%; font-size: 16px; cursor: pointer; transition: 0.2s; }
-    .btn:active { transform: scale(0.95); }
-    .shake { animation: shake 0.4s; }
-    @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
-  </style>
-</head>
-<body>
+async function home(){
+CATS=(await R(()=>sb.from("categories").select("*").order("id"))).data||[];
+card(`<div class=card><div class=row>${U?`<div><h3>👋 ${esc(P.name||disp(P.email))}</h3>${sign(P)}</div><div>${P.is_admin?'<button class=y id=ad>🛠 Admin</button>':''}<button class=g id=lo>Logout</button></div>`:`<div><h3>👤 Guest</h3><span class=m>Free · တစ်ရက် ${CFG.free_limit} ပုဒ်</span></div><div><button class=y id=li>🔐 Login / Register</button></div>`}</div></div>
+<div class=card><h3>📚 Category ရွေးပါ</h3>${CATS.map(c=>`<button class=o data-c=${c.id}>📘 ${esc(c.name)} <span class=m>(${c.secs}s/ပုဒ်)</span></button>`).join("")||"<p class=m>Category မရှိသေးပါ</p>"}</div>
+${P.is_premium?"":`<div class=card style="background:linear-gradient(135deg,#ffe259,#ffa751)"><h3>💎 Premium ဝင်ပါ</h3><p>✅ Category အားလုံး ✅ ဖြေလိုသလောက် (၅/၁၀/၂၀/၃၀…) ✅ နေ့စဉ် ကန့်သတ်ချက်မရှိ<br>🆓 Free က တစ်ရက် ${CFG.free_limit} ပုဒ်ပဲ ဖြေရပါတယ်</p><button id=pm>💎 Premium ဝင်မယ်</button></div>`}`);
+if($("#li"))$("#li").onclick=()=>authView();if($("#lo"))$("#lo").onclick=async()=>{clearInterval(window.__t);window.__t=0;await sb.auth.signOut();U=null;P={};home()};if($("#ad"))$("#ad").onclick=()=>admin("gen");if($("#pm"))$("#pm").onclick=premium;
+document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>pickCat(+b.dataset.c))}
 
-  <h1>✨ Daily Knowledge Quiz ✨</h1>
+async function pickCat(id){
+if(P.is_premium){card(`<div class=card><h3>📝 ဘယ်နှပုဒ်ဖြေမလဲ?</h3>${[5,10,20,30].map(n=>`<button data-n=${n}>${n}</button>`).join("")}<input id=cn type=number placeholder="စိတ်ကြိုက်ဂဏန်း"><button class=y id=go>စမယ်</button><button class=g id=bk>⬅ Back</button></div>`);
+document.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>quiz(id,+b.dataset.n));$("#go").onclick=()=>quiz(id,+$("#cn").value||10);$("#bk").onclick=home;return}
+const g=await R(()=>sb.rpc("guest_start",{p_did:DID(),p_cat:id})),gd=g.data;if(g.error||!gd)return alert("ချိတ်ဆက်မရပါ၊ ပြန်စမ်းပါ ["+(g.error?.message||"")+"]");const left=gd.ok?1:0;
+if(left<=0){card(`<div class=card><h3>⏳ ဒီနေ့အတွက် ${CFG.free_limit} ပုဒ် ဖြေပြီးပါပြီ</h3><p style="white-space:pre-wrap;line-height:1.7">${esc(CFG.limit_msg)}</p><button id=pm>💎 Premium ဝင်မယ်</button><button class=g id=bk>⬅ Back</button></div>`);$("#pm").onclick=premium;$("#bk").onclick=home;return}
+quiz(id,0,gd.qs)}
 
-  <div class="quiz-card" id="quizContainer">
-    <h2 id="question">မေးခွန်း တင်ပြပါမည်...</h2>
-    <div id="options"></div>
-  </div>
+let Q=[],qi=0,sc=0,left=0,secs=30,t0=0,lock=false,cat=null;
+async function quiz(id,n,pre){cat=CATS.find(c=>c.id==id);secs=cat.secs;
+const r=pre?{data:pre}:await R(()=>sb.from("questions").select("*").eq("cat_id",id));const a=(r.data||[]).sort(()=>Math.random()-.5).slice(0,pre?pre.length:n);
+if(!a.length){card(`<div class=card>မေးခွန်းမရှိသေးပါ <button id=bk>⬅</button></div>`);$("#bk").onclick=home;return}
+Q=a;qi=0;sc=0;t0=Date.now();ask()}
+function ask(){if(qi>=Q.length)return fin();lock=false;left=secs;const q=Q[qi];
+card(`<div class=card><div class=row><b>❓ ${qi+1}/${Q.length}</b><b>⏱ <span id=t>${left}</span>s</b></div><div class=bar><i id=bar></i></div><h2>${esc(q.q)}</h2>${q.options.map((x,k)=>`<button class=o data-k=${k}>${"ABCD"[k]}. ${esc(x)}</button>`).join("")}<div id=ex class=m></div></div>`);
+document.querySelectorAll(".o").forEach(b=>b.onclick=()=>pick(+b.dataset.k));
+clearInterval(tm);tm=setInterval(()=>{left--;$("#t").textContent=left;$("#bar").style.width=left/secs*100+"%";$("#t").style.color=left<=5?"#ff1744":"";if(left>0&&left<=5)tick(left);if(left<=0)pick(-1)},1000)}
+function pick(k){if(lock)return;lock=true;clearInterval(tm);const q=Q[qi],ok=k==q.answer,bs=document.querySelectorAll(".o");
+bs[q.answer].classList.add("ok");if(k>=0&&!ok)bs[k].classList.add("no");
+if(ok){sc++;boom();good()}else{bad();document.body.classList.add("fl");setTimeout(()=>document.body.classList.remove("fl"),500)}
+$("#ex").innerHTML=(ok?"🎉 မှန်ပါတယ်!":k<0?"⌛ အချိန်ကုန်ပြီ":"💥 မှားပါတယ်")+"<br>💡 "+esc(q.explanation||"");
+setTimeout(()=>{qi++;ask()},ok?1300:2500)}
+async function fin(){const s=Math.round((Date.now()-t0)/1000),pc=Math.round(sc*100/Q.length);
+card(`<div class=card style="text-align:center"><div style="font-size:56px">${pc>=70?"🏆":pc>=40?"👍":"💪"}</div><h2>ရလဒ်: ${sc}/${Q.length} (${pc}%)<br>⏱ ${Math.floor(s/60)}မိ ${s%60}စက္ကန့်</h2><div id=st class=m>📤 Admin ထံပို့နေသည်…</div>${P.is_premium?"":'<button class=y id=pm>💎 Premium ဝင်ပြီး ဆက်ဖြေမယ်</button>'}<button id=bk>🏠 Home</button></div>`);
+$("#bk").onclick=home;if($("#pm"))$("#pm").onclick=premium;if(pc>=70)boom(3);pc>=50?winEnd():loseEnd();
+const r=await R(()=>P.is_premium&&U?sb.from("results").insert({user_id:U.id,cat_id:cat.id,score:sc,total:Q.length,secs:s}):sb.rpc("guest_result",{p_did:DID(),p_who:U?(P.name||disp(P.email)):"Guest",p_cat:cat.id,p_score:sc,p_total:Q.length,p_secs:s}));$("#st").textContent=r.error?"⚠️ သိမ်းမရပါ":"✅ Admin ထံ ပို့ပြီး"}
 
-  <script>
-    // အဖြေမှန်ပါက အမှုန်ကျစေသည့် Function
-    function onCorrectAnswer() {
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    }
+async function premium(){
+if(!U){NEXT="premium";return authView("Premium ဝင်ရန် အကောင့်အရင်ဖွင့်/ဝင်ပါ")}
+const s=Object.fromEntries(((await R(()=>sb.from("settings").select("*"))).data||[]).map(x=>[x.key,x.value]));
+card(`<div class=card><h3>💎 Premium ဝင်ရန်</h3>${s.kpay_img?`<img class=q src="${esc(s.kpay_img)}">`:""}<p>${esc(s.kpay_note||"KPay ဖြင့် ငွေလွှဲပါ")}</p><p>📸 ငွေလွှဲပြီး ပြေစာ screenshot ကို ပို့ပါ — ချက်ချင်း Premium ဖြစ်ပါမယ်!</p><input id=f type=file accept="image/*"><button id=up>📤 ပြေစာပို့မယ်</button><button class=g id=bk>⬅ Back</button><div id=er class=m></div></div>`);
+$("#bk").onclick=home;$("#up").onclick=async()=>{const f=$("#f").files[0];if(!f)return $("#er").textContent="ပုံရွေးပါ";$("#er").textContent="⏳…";
+const path=U.id+"/"+Date.now()+".jpg";const u=await R(()=>sb.storage.from("receipts").upload(path,f));if(u.error)return $("#er").textContent="❌ "+u.error.message;
+const url=sb.storage.from("receipts").getPublicUrl(path).data.publicUrl;const c=await R(()=>sb.rpc("claim_premium",{url}));
+if(c.error)return $("#er").textContent="❌ "+c.error.message;await loadP();alert("🎉 Premium ဖြစ်ပါပြီ! Admin က စစ်ဆေးပါမည်။");home()}}
 
-    // အဖြေမှားပါက တုန်ခါသွားစေသည့် Function
-    function onWrongAnswer() {
-      const container = document.getElementById('quizContainer');
-      container.classList.add('shake');
-      setTimeout(() => container.classList.remove('shake'), 400);
-    }
-  </script>
-</body>
-</html>
+// ---------------- Admin ----------------
+async function readFile(f){if(!f)return{};const n=f.name.toLowerCase();
+const b64=b=>new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result.split(",")[1]);x.readAsDataURL(b)});
+if(f.type.startsWith("image/")){try{const bm=await createImageBitmap(f),k=Math.min(1,1600/Math.max(bm.width,bm.height)),c2=document.createElement("canvas");c2.width=Math.round(bm.width*k);c2.height=Math.round(bm.height*k);c2.getContext("2d").drawImage(bm,0,0,c2.width,c2.height);return{image:{mime:"image/jpeg",data:c2.toDataURL("image/jpeg",.85).split(",")[1]}}}catch(e){return{image:{mime:f.type,data:await b64(f)}}}}
+if(n.endsWith(".pdf")||/^(audio|video)\//.test(f.type)){const mime=n.endsWith(".pdf")?"application/pdf":f.type;const p=U.id+"/"+Date.now()+"_"+(n.replace(/[^a-z0-9.]/g,"")||"f");
+const u=await R(()=>sb.storage.from("uploads").upload(p,f,{contentType:mime}));if(u.error)throw u.error;return{path:p,mime}}
+if(/\.(xlsx|xls|csv)$/.test(n)){const wb=XLSX.read(await f.arrayBuffer());return{text:wb.SheetNames.map(s=>XLSX.utils.sheet_to_csv(wb.Sheets[s])).join("\n")}}
+if(n.endsWith(".docx"))return{text:(await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value};
+if(n.endsWith(".pptx")){const z=await JSZip.loadAsync(await f.arrayBuffer());let t="";for(const k of Object.keys(z.files).filter(k=>/ppt\/slides\/slide\d+\.xml$/.test(k)))t+=[...(await z.files[k].async("string")).matchAll(/<a:t>([^<]*)<\/a:t>/g)].map(m=>m[1]).join(" ")+"\n";return{text:t}}
+return{text:await f.text()}}
+async function callAI(body){let m="";for(let i=0;i<2;i++){const{data,error}=await sb.functions.invoke("ai",{body});if(!error&&data&&!data.error)return data;m=error?.message||data?.error||"";try{m=(await error.context.json()).error||m}catch{}if(/Admin|Login|Gemini:/.test(m))return{error:m};await sleep(1500)}return{error:m||"လိုင်းကျပ်နေသည်၊ ပြန်စမ်းပါ"}}
+const TABS={gen:"🤖 Quiz",qs:"❓ မေးခွန်း",chat:"💬 AI Chat",cat:"📁 Category",users:"👥 Users",res:"📊 ရလဒ်",pay:"💳 KPay/ပြေစာ",set:"⚙️ Settings"};
+async function admin(t){card(`<div class=card><div class=row><h3>🛠 Admin Panel</h3><button class=g id=hm>🏠</button></div><div class=tabs>${Object.entries(TABS).map(([k,v])=>`<button class="${k==t?"":"g"}" data-t=${k}>${v}</button>`).join("")}</div></div><div class=card id=body>⏳</div>`);
+$("#hm").onclick=home;document.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>admin(b.dataset.t));
+CATS=(await R(()=>sb.from("categories").select("*").order("id"))).data||[];const B=$("#body"),opts=CATS.map(c=>`<option value=${c.id}>${esc(c.name)}</option>`).join("");
+if(t=="gen"){B.innerHTML=`<select id=c>${opts}</select><input id=n type=number value=10 placeholder="ပုဒ်ရေ"><textarea id=cm rows=3 placeholder="🤖 AI ကို command ပေးပါ (ဥပမာ: မြန်မာနိုင်ငံ ပထဝီအကြောင်း အလယ်အလတ် မေးခွန်း ထုတ်ပေး)"></textarea><textarea id=tx rows=5 placeholder="Text ရိုက်/paste လုပ်ပါ (သို့) ဖိုင်ရွေးပါ"></textarea><input id=f type=file accept="image/*,.pdf,.txt,.docx,.pptx,.xlsx,.xls,.csv"><button id=g>🤖 Quiz ထုတ်မယ်</button><div id=st class=m></div>`;
+$("#g").onclick=async()=>{if(!$("#c").value)return $("#st").textContent="Category အရင်ဆောက်ပါ";$("#st").textContent="⏳ ထုတ်နေသည်… (ခဏစောင့်ပါ)";
+try{const fr=await readFile($("#f").files[0]);const r=await callAI({mode:"quiz",count:+$("#n").value||10,text:($("#cm").value.trim()?"ADMIN INSTRUCTION (follow this; if no content is given, use your own knowledge): "+$("#cm").value.trim()+"\n\nCONTENT:\n":"")+$("#tx").value+"\n"+(fr.text||""),image:fr.image,path:fr.path,mime:fr.mime});if(r.error)return $("#st").textContent="❌ "+r.error;
+const rows=r.questions.map(x=>({cat_id:+$("#c").value,q:x.q,options:x.o,answer:+x.a,explanation:x.e||""}));const i=await R(()=>sb.from("questions").insert(rows));$("#st").textContent=i.error?"❌ "+i.error.message:"✅ မေးခွန်း "+rows.length+" ပုဒ် ထည့်ပြီး"}catch(e){$("#st").textContent="❌ "+e.message}}}
+if(t=="chat"){B.innerHTML=`<div id=log></div><textarea id=m rows=2 placeholder="မေးပါ…"></textarea><button id=s>➤ ပို့မယ်</button>`;$("#s").onclick=async()=>{const m=$("#m").value.trim();if(!m)return;$("#m").value="";$("#log").innerHTML+=`<div class="msg me">${esc(m)}</div>`;const r=await callAI({mode:"chat",text:m});$("#log").innerHTML+=`<div class="msg ai">${esc(r.text||"❌ "+r.error)}</div>`}}
+if(t=="qs"){B.innerHTML=`<select id=qc>${opts}</select><div id=ql></div>`;
+const form=(x,id)=>`<div class=it data-id="${id}"><textarea rows=2 data-f=q placeholder="မေးခွန်း">${esc(x.q||"")}</textarea>${[0,1,2,3].map(k=>`<input data-f=o${k} placeholder="${"ABCD"[k]}" value="${esc((x.options||[])[k]||"")}">`).join("")}<select data-f=a>${[0,1,2,3].map(k=>`<option value=${k} ${x.answer==k?"selected":""}>အဖြေမှန်: ${"ABCD"[k]}</option>`).join("")}</select><input data-f=e placeholder="ရှင်းလင်းချက်" value="${esc(x.explanation||"")}"><button data-sv>💾 သိမ်း</button>${id=="new"?"":'<button class=r data-del>🗑</button>'}</div>`;
+const load=async()=>{const cid=+$("#qc").value;if(!cid){$("#ql").textContent="Category အရင်ဆောက်ပါ";return}
+const rs=(await R(()=>sb.from("questions").select("*").eq("cat_id",cid).order("id",{ascending:false}).limit(200))).data||[];
+$("#ql").innerHTML=`<h3>➕ အသစ်ထည့်ရန်</h3>${form({},"new")}<p class=m>${rs.length} ပုဒ်</p>`+rs.map(x=>form(x,x.id)).join("");
+document.querySelectorAll("[data-sv]").forEach(b=>b.onclick=async()=>{const w=b.closest(".it"),g=f=>w.querySelector(`[data-f=${f}]`).value.trim(),id=w.dataset.id;
+const row={cat_id:cid,q:g("q"),options:[0,1,2,3].map(k=>g("o"+k)),answer:+g("a"),explanation:g("e")};
+if(!row.q||row.options.some(o=>!o))return alert("မေးခွန်းနဲ့ ရွေးချယ်စရာ ၄ ခုလုံး ဖြည့်ပါ");
+const r=await R(()=>id=="new"?sb.from("questions").insert(row):sb.from("questions").update(row).eq("id",id));if(r.error)return alert(r.error.message);if(id=="new")load();else b.textContent="✅"});
+document.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{if(confirm("ဖျက်မလား?")){await R(()=>sb.from("questions").delete().eq("id",b.closest(".it").dataset.id));load()}})};
+$("#qc").onchange=load;load()}
+if(t=="set"){B.innerHTML=`<label class=m>ခေါင်းစဉ်</label><input id=ti value="${esc(CFG.site_title)}"><label class=m>Free user နေ့စဉ် ဖြေခွင့် (ပုဒ်ရေ)</label><input id=fl type=number min=1 value=${CFG.free_limit}><label class=m>Limit ပြည့်ရင် Free user ကိုပြမယ့်စာ (Premium ဝင်ရန် ဆွဲဆောင်စာ)</label><textarea id=lm rows=4>${esc(CFG.limit_msg)}</textarea><label class=m>Logo (ပုံ)</label>${CFG.site_logo?`<img class=q style="max-height:80px" src="${esc(CFG.site_logo)}"><br><button class=g id=rl>🗑 Logo ဖယ်မယ်</button>`:""}<input id=lf type=file accept="image/*"><button id=sv>💾 သိမ်းမယ်</button><div id=st class=m></div>`;
+const put=(key,value)=>R(()=>sb.from("settings").upsert({key,value:String(value)}));
+if($("#rl"))$("#rl").onclick=async()=>{await put("site_logo","");await loadCfg();admin("set")};
+$("#sv").onclick=async()=>{$("#st").textContent="⏳…";const f=$("#lf").files[0];
+if(f){const p="logo/"+Date.now()+".jpg";const u=await R(()=>sb.storage.from("receipts").upload(p,f));if(u.error)return $("#st").textContent="❌ "+u.error.message;await put("site_logo",sb.storage.from("receipts").getPublicUrl(p).data.publicUrl)}
+await put("site_title",$("#ti").value.trim()||"intellearn Quiz");await put("free_limit",Math.max(1,+$("#fl").value||10));await put("limit_msg",$("#lm").value.trim());await loadCfg();$("#st").textContent="✅ သိမ်းပြီး";if(f)admin("set")}}
+if(t=="cat"){B.innerHTML=`<input id=nm placeholder="Category နာမည်"><input id=sc type=number value=30 placeholder="စက္ကန့်/ပုဒ်"><button id=ad>➕ ထည့်မယ်</button>`+CATS.map(c=>`<div class=it>${esc(c.name)} • <input style="width:70px;display:inline;padding:6px" type=number value=${c.secs} data-s=${c.id}>s <button class=g data-u=${c.id}>💾</button><button class=r data-d=${c.id}>🗑</button></div>`).join("");
+$("#ad").onclick=async()=>{await R(()=>sb.from("categories").insert({name:$("#nm").value,secs:+$("#sc").value||30}));admin("cat")};
+document.querySelectorAll("[data-u]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("categories").update({secs:+document.querySelector(`[data-s="${b.dataset.u}"]`).value}).eq("id",b.dataset.u));b.textContent="✅"});
+document.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{if(confirm("မေးခွန်းတွေပါ ပျက်မယ်၊ သေချာလား?")){await R(()=>sb.from("categories").delete().eq("id",b.dataset.d));admin("cat")}})}
+if(t=="users"){const us=(await R(()=>sb.from("profiles").select("*").order("created_at",{ascending:false}))).data||[];B.innerHTML=`<p class=m>${us.length} ဦး</p>`+us.map(u=>`<div class=it><b>${esc(u.name||"-")}</b> ${sign(u)}${u.is_admin?' <span class="b p">Admin</span>':''}<br><span class=m>${esc(disp(u.email))}</span><br><button class="${u.is_premium?"r":""}" data-p=${u.id} data-v=${u.is_premium}>${u.is_premium?"💎 ပြန်ဖြုတ်":"💎 Premium ပေး"}</button>${u.id!=U.id?`<button class=g data-a=${u.id} data-v=${u.is_admin}>${u.is_admin?"Admin ဖြုတ်":"Admin ခန့်"}</button>`:""}</div>`).join("");
+document.querySelectorAll("[data-p]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("profiles").update({is_premium:b.dataset.v!="true"}).eq("id",b.dataset.p));admin("users")});
+document.querySelectorAll("[data-a]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("profiles").update({is_admin:b.dataset.v!="true"}).eq("id",b.dataset.a));admin("users")})}
+if(t=="res"){const rs0=(await R(()=>sb.from("results").select("*,profiles(name,email)").order("created_at",{ascending:false}).limit(100))).data||[];
+const gs=((await R(()=>sb.from("guest_results").select("*").order("created_at",{ascending:false}).limit(100))).data||[]).map(g=>({...g,profiles:{name:"👤 "+(g.who||"Guest")+" ("+String(g.device_id).slice(0,6)+")"}}));
+const rs=[...rs0,...gs].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));B.innerHTML=rs.map(r=>`<div class=it><b>${esc(r.profiles?.name||disp(r.profiles?.email))}</b> • ${esc(CATS.find(c=>c.id==r.cat_id)?.name||r.cat_id)}<br>✅ ${r.score}/${r.total} • ⏱ ${r.secs}s <span class=m>${new Date(r.created_at).toLocaleString()}</span></div>`).join("")||"မရှိသေးပါ"}
+if(t=="pay"){const rc=(await R(()=>sb.from("receipts").select("*,profiles(name,email,is_premium)").order("created_at",{ascending:false}).limit(30))).data||[];
+B.innerHTML=`<h3>KPay QR ပြင်ရန်</h3><input id=f type=file accept="image/*"><textarea id=nt rows=3 placeholder="KPay အချက်အလက် (နာမည်၊ ဖုန်း၊ ပမာဏ)"></textarea><button id=sv>💾 သိမ်းမယ်</button><div id=st class=m></div><h3>🧾 ပြေစာများ</h3>`+rc.map(r=>`<div class=it><b>${esc(r.profiles?.name||disp(r.profiles?.email))}</b> ${r.profiles?.is_premium?"💎":"❌"}<br><a href="${esc(r.image_url)}" target=_blank><img class=q style="max-height:160px" src="${esc(r.image_url)}"></a><br><button class=r data-r=${r.user_id}>ပြန်ဖြုတ်ချ</button></div>`).join("");
+const cur=(await R(()=>sb.from("settings").select("*").eq("key","kpay_note"))).data;if(cur&&cur[0])$("#nt").value=cur[0].value;
+$("#sv").onclick=async()=>{$("#st").textContent="⏳…";const f=$("#f").files[0];if(f){const p="kpay/"+Date.now()+".jpg";const u=await R(()=>sb.storage.from("receipts").upload(p,f));if(u.error)return $("#st").textContent="❌ "+u.error.message;await R(()=>sb.from("settings").upsert({key:"kpay_img",value:sb.storage.from("receipts").getPublicUrl(p).data.publicUrl}))}
+await R(()=>sb.from("settings").upsert({key:"kpay_note",value:$("#nt").value}));$("#st").textContent="✅ သိမ်းပြီး"};
+document.querySelectorAll("[data-r]").forEach(b=>b.onclick=async()=>{await R(()=>sb.from("profiles").update({is_premium:false}).eq("id",b.dataset.r));admin("pay")})}}
+
+// confetti
+const cv=$("#cv"),cx=cv.getContext("2d");let ps=[];const rz=()=>{cv.width=innerWidth;cv.height=innerHeight};rz();onresize=rz;
+function boom(n=1){const was=ps.length;for(let j=0;j<80*n;j++)ps.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*14,vy:Math.random()*-12-2,r:Math.random()*5+2,c:`hsl(${Math.random()*360},90%,60%)`,l:90});if(!was)lp()}
+function lp(){cx.clearRect(0,0,cv.width,cv.height);ps=ps.filter(p=>p.l-->0);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.4;cx.fillStyle=p.c;cx.globalAlpha=p.l/90;cx.fillRect(p.x,p.y,p.r,p.r)});if(ps.length)requestAnimationFrame(lp);else cx.clearRect(0,0,cv.width,cv.height)}
+init();
+</script></body></html>
